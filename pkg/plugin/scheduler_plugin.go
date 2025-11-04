@@ -287,7 +287,8 @@ func NewSchedulerPlugin(_ context.Context, _ runtime.Object, handle framework.Ha
 	}
 
 	// we need our own informer factory here because the informers we get from the framework handle aren't yet initialized
-	informerFactory := informers.NewSharedInformerFactory(handle.ClientSet(), 0)
+	resyncPeriod := utils.GetInformerResyncPeriod()
+	informerFactory := informers.NewSharedInformerFactory(handle.ClientSet(), resyncPeriod)
 	ss := shim.NewShimSchedulerForPlugin(serviceContext.RMProxy, informerFactory, conf.GetSchedulerConf(), configMaps)
 	if err := ss.Run(); err != nil {
 		log.Log(log.ShimSchedulerPlugin).Fatal("Unable to start scheduler", zap.Error(err))

@@ -28,6 +28,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
 
+	"github.com/apache/yunikorn-k8shim/pkg/common/utils"
 	"github.com/apache/yunikorn-k8shim/pkg/conf"
 	"github.com/apache/yunikorn-k8shim/pkg/locking"
 	"github.com/apache/yunikorn-k8shim/pkg/log"
@@ -186,7 +187,9 @@ func (s *APIFactory) AddEventHandler(handlers *ResourceEventHandlers) error {
 	}
 
 	log.Log(log.ShimClient).Info("registering event handler", zap.Stringer("type", handlers.Type))
-	if err := s.addEventHandlers(handlers.Type, h, 0); err != nil {
+
+	resyncPeriod := utils.GetInformerResyncPeriod()
+	if err := s.addEventHandlers(handlers.Type, h, resyncPeriod); err != nil {
 		return errors.Join(errors.New("failed to initialize event handlers: "), err)
 	}
 	return nil

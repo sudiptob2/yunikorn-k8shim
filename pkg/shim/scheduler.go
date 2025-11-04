@@ -61,8 +61,8 @@ var (
 func NewShimScheduler(scheduler api.SchedulerAPI, configs *conf.SchedulerConf, bootstrapConfigMaps []*v1.ConfigMap) *KubernetesShim {
 	kubeClient := client.NewKubeClient(configs.KubeConfig)
 
-	// we have disabled re-sync to keep ourselves up-to-date
-	informerFactory := informers.NewSharedInformerFactory(kubeClient.GetClientSet(), 0)
+	resyncPeriod := utils.GetInformerResyncPeriod()
+	informerFactory := informers.NewSharedInformerFactory(kubeClient.GetClientSet(), resyncPeriod)
 
 	apiFactory := client.NewAPIFactory(scheduler, informerFactory, configs, false)
 	context := cache.NewContextWithBootstrapConfigMaps(apiFactory, bootstrapConfigMaps)

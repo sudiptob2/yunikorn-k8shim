@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -56,6 +57,24 @@ func SetPluginMode(value bool) {
 
 func IsPluginMode() bool {
 	return pluginMode
+}
+
+// GetInformerResyncPeriod returns the resync period for informers from environment variable.
+func GetInformerResyncPeriod() time.Duration {
+	if envVal, ok := os.LookupEnv(conf.EnvInformerResyncPeriod); ok && envVal != "" {
+		if duration, err := time.ParseDuration(envVal); err == nil && duration >= 0 {
+			if duration > 0 {
+				log.Log(log.ShimUtils).Info("Informer resync enabled",
+					zap.String("resyncPeriod", duration.String()),
+					zap.String("envVar", conf.EnvInformerResyncPeriod))
+				return duration
+			}
+			return 0
+		}
+		log.Log(log.ShimUtils).Warn("Invalid YUNIKORN_INFORMER_RESYNC_PERIOD value, using default (disabled)",
+			zap.String("value", envVal))
+	}
+	return 0 // Default: disabled
 }
 
 func Convert2Pod(obj interface{}) (*v1.Pod, error) {

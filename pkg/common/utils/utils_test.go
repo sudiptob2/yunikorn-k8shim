@@ -23,6 +23,7 @@ import (
 	"compress/gzip"
 	"errors"
 	"fmt"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -1500,5 +1501,62 @@ func TestWaitForCondition(t *testing.T) {
 		} else {
 			assert.Equal(t, get.Error(), test.output.Error())
 		}
+	}
+}
+
+func TestGetInformerResyncPeriod(t *testing.T) {
+	testCases := []struct {
+		name     string
+		envValue string
+		expected time.Duration
+		setEnv   bool
+	}{
+		{
+			name:     "environment variable not set",
+			envValue: "",
+			expected: 0,
+			setEnv:   false,
+		},
+		{
+			name:     "environment variable set to empty string",
+			envValue: "",
+			expected: 0,
+			setEnv:   true,
+		},
+		{
+			name:     "environment variable set to valid positive duration",
+			envValue: "30s",
+			expected: 30 * time.Second,
+			setEnv:   true,
+		},
+		{
+			name:     "environment variable set to 0",
+			envValue: "0",
+			expected: 0,
+			setEnv:   true,
+		},
+		{
+			name:     "environment variable set to invalid value",
+			envValue: "invalid",
+			expected: 0,
+			setEnv:   true,
+		},
+		{
+			name:     "environment variable set to negative duration",
+			envValue: "-10s",
+			expected: 0,
+			setEnv:   true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.setEnv {
+				os.Setenv(conf.EnvInformerResyncPeriod, tc.envValue)
+			}
+
+			result := GetInformerResyncPeriod()
+			assert.Equal(t, result, tc.expected)
+		})
 	}
 }

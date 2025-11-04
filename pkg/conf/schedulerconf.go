@@ -47,9 +47,10 @@ type SchedulerConfFactory = func() *SchedulerConf
 
 const (
 	// env vars
-	EnvHome       = "HOME"
-	EnvKubeConfig = "KUBECONFIG"
-	EnvNamespace  = "NAMESPACE"
+	EnvHome                 = "HOME"
+	EnvKubeConfig           = "KUBECONFIG"
+	EnvNamespace            = "NAMESPACE"
+	EnvInformerResyncPeriod = "YUNIKORN_INFORMER_RESYNC_PERIOD"
 
 	// prefixes
 	PrefixService             = "service."
