@@ -19,8 +19,11 @@
 package cache
 
 import (
+	"errors"
 	"testing"
+	"time"
 
+	"go.uber.org/zap"
 	"gotest.tools/v3/assert"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -216,4 +219,61 @@ func TestGetTaskGroupFromAnnotation(t *testing.T) {
 	assert.Equal(t, taskGroups2[0].MinMember, int32(3))
 	assert.Equal(t, taskGroups2[0].MinResource["cpu"], resource.MustParse("2"))
 	assert.Equal(t, taskGroups2[0].MinResource["memory"], resource.MustParse("1Gi"))
+}
+
+func TestRetryWithExponentialBackoff(t *testing.T) {
+	logger := zap.NewNop()
+	baseDelay := 10 * time.Millisecond
+
+	tests := []struct {
+		name             string
+		maxRetries       int
+		successOnAttempt int // =0 always fail, >0 succeed on this attempt
+		expectedErr      error
+		expectedAttempt  int
+	}{
+		{
+			name:             "success on first attempt",
+			maxRetries:       3,
+			successOnAttempt: 1,
+			expectedErr:      nil,
+			expectedAttempt:  1,
+		},
+		{
+			name:             "success after retries",
+			maxRetries:       5,
+			successOnAttempt: 3,
+			expectedErr:      nil,
+			expectedAttempt:  3,
+		},
+		{
+			name:             "failure after all retries",
+			maxRetries:       3,
+			successOnAttempt: 0,
+			expectedErr:      errors.New("persistent error"),
+			expectedAttempt:  3,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			attemptCount := 0
+			operation := func() error {
+				attemptCount++
+				if tt.successOnAttempt > 0 && attemptCount == tt.successOnAttempt {
+					return nil
+				}
+				return errors.New("persistent error")
+			}
+
+			err := RetryWithExponentialBackoff(tt.maxRetries, baseDelay, operation, "test-operation", "test-task", logger)
+
+			if tt.expectedErr == nil {
+				assert.NilError(t, err)
+			} else {
+				assert.Error(t, err, tt.expectedErr.Error())
+			}
+			assert.Equal(t, attemptCount, tt.expectedAttempt)
+		})
+	}
 }
