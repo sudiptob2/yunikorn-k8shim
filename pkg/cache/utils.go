@@ -83,7 +83,7 @@ func RetryWithExponentialBackoff(
 				zap.Duration("backoff", delay),
 				zap.Error(lastErr))
 			time.Sleep(delay)
-			delay = delay * 2 // exponential backoff
+			delay *= 2 // exponential backoff
 		}
 
 		lastErr = operation()
