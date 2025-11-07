@@ -371,11 +371,23 @@ func (task *Task) postTaskAllocated() {
 				"Successfully assigned %s to node %s", task.alias, task.nodeName)
 
 			// before binding pod to node, first bind volumes to pod
+			const maxRetries = 5
+			const baseDelay = 100 * time.Millisecond
 			log.Log(log.ShimCacheTask).Debug("bind pod volumes",
 				zap.String("podName", task.pod.Name),
 				zap.String("podUID", string(task.pod.UID)))
-			if err := task.context.bindPodVolumes(task.pod); err != nil {
-				log.Log(log.ShimCacheTask).Error("bind volumes to pod failed", zap.String("taskID", task.taskID), zap.Error(err))
+
+			if err := RetryWithExponentialBackoff(
+				maxRetries,
+				baseDelay,
+				func() error {
+					return task.context.bindPodVolumes(task.pod)
+				},
+				"bindPodVolumes",
+				task.taskID,
+				log.Log(log.ShimCacheTask),
+			); err != nil {
+				log.Log(log.ShimCacheTask).Error("bind volumes to pod failed after retries", zap.String("taskID", task.taskID), zap.Error(err))
 				task.failWithEvent(fmt.Sprintf("bind volumes to pod failed, name: %s, %s", task.alias, err.Error()), "PodVolumesBindFailure")
 				return
 			}
@@ -384,8 +396,17 @@ func (task *Task) postTaskAllocated() {
 				zap.String("podName", task.pod.Name),
 				zap.String("podUID", string(task.pod.UID)))
 
-			if err := task.context.apiProvider.GetAPIs().KubeClient.Bind(task.pod, task.nodeName); err != nil {
-				log.Log(log.ShimCacheTask).Error("bind pod to node failed", zap.String("taskID", task.taskID), zap.Error(err))
+			if err := RetryWithExponentialBackoff(
+				maxRetries,
+				baseDelay,
+				func() error {
+					return task.context.apiProvider.GetAPIs().KubeClient.Bind(task.pod, task.nodeName)
+				},
+				"bindPod",
+				task.taskID,
+				log.Log(log.ShimCacheTask),
+			); err != nil {
+				log.Log(log.ShimCacheTask).Error("bind pod to node failed after retries", zap.String("taskID", task.taskID), zap.Error(err))
 				task.failWithEvent(fmt.Sprintf("bind pod to node failed, name: %s, %s", task.alias, err.Error()), "PodBindFailure")
 				return
 			}

@@ -21,7 +21,9 @@ package cache
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
+	"go.uber.org/zap"
 	v1 "k8s.io/api/core/v1"
 
 	"github.com/apache/yunikorn-k8shim/pkg/common/constants"
@@ -59,4 +61,47 @@ func GetTaskGroupsFromAnnotation(pod *v1.Pod) ([]TaskGroup, error) {
 		}
 	}
 	return taskGroups, nil
+}
+
+// RetryWithExponentialBackoff retries a function with exponential backoff.
+// It performs up to maxRetries attempts with exponential backoff starting at baseDelay.
+// Returns the last error if all retries fail, or nil on success.
+func RetryWithExponentialBackoff(
+	maxRetries int,
+	baseDelay time.Duration,
+	operation func() error, operationName string, taskID string, logger *zap.Logger) error {
+	var lastErr error
+	delay := baseDelay
+
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		if attempt > 0 {
+			logger.Warn("retrying operation",
+				zap.String("operation", operationName),
+				zap.String("taskID", taskID),
+				zap.Int("attempt", attempt+1),
+				zap.Int("maxRetries", maxRetries),
+				zap.Duration("backoff", delay),
+				zap.Error(lastErr))
+			time.Sleep(delay)
+			delay = delay * 2 // exponential backoff
+		}
+
+		lastErr = operation()
+		if lastErr == nil {
+			if attempt > 0 {
+				logger.Info("operation succeeded after retry",
+					zap.String("operation", operationName),
+					zap.String("taskID", taskID),
+					zap.Int("attempt", attempt+1))
+			}
+			return nil
+		}
+	}
+
+	logger.Error("operation failed after all retries",
+		zap.String("operation", operationName),
+		zap.String("taskID", taskID),
+		zap.Int("totalAttempts", maxRetries),
+		zap.Error(lastErr))
+	return lastErr
 }
