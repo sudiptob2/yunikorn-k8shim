@@ -253,6 +253,13 @@ func TestRetryWithExponentialBackoff(t *testing.T) {
 			expectedErr:      errors.New("persistent error"),
 			expectedAttempt:  3,
 		},
+		{
+			name:             "infinite retry succeeds",
+			maxRetries:       -1,
+			successOnAttempt: 5,
+			expectedErr:      nil,
+			expectedAttempt:  5,
+		},
 	}
 
 	for _, tt := range tests {

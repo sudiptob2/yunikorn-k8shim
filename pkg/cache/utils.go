@@ -65,6 +65,7 @@ func GetTaskGroupsFromAnnotation(pod *v1.Pod) ([]TaskGroup, error) {
 
 // RetryWithExponentialBackoff retries a function with exponential backoff.
 // It performs up to maxRetries attempts with exponential backoff starting at baseDelay.
+// If maxRetries is negative, it will retry indefinitely until the operation succeeds.
 // Returns the last error if all retries fail, or nil on success.
 func RetryWithExponentialBackoff(
 	maxRetries int,
@@ -72,8 +73,9 @@ func RetryWithExponentialBackoff(
 	operation func() error, operationName string, taskID string, logger *zap.Logger) error {
 	var lastErr error
 	delay := baseDelay
+	infiniteRetry := maxRetries < 0
 
-	for attempt := 0; attempt < maxRetries; attempt++ {
+	for attempt := 0; infiniteRetry || attempt < maxRetries; attempt++ {
 		if attempt > 0 {
 			logger.Warn("retrying operation",
 				zap.String("operation", operationName),
@@ -98,10 +100,14 @@ func RetryWithExponentialBackoff(
 		}
 	}
 
-	logger.Error("operation failed after all retries",
-		zap.String("operation", operationName),
-		zap.String("taskID", taskID),
-		zap.Int("totalAttempts", maxRetries),
-		zap.Error(lastErr))
+	if !infiniteRetry {
+		logger.Error("operation failed after all retries",
+			zap.String("operation", operationName),
+			zap.String("taskID", taskID),
+			zap.Int("totalAttempts", maxRetries),
+			zap.Error(lastErr))
+		return lastErr
+	}
+	// This should never be reached for infinite retry, but included anyway
 	return lastErr
 }
