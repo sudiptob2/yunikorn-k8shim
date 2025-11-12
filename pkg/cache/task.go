@@ -33,6 +33,7 @@ import (
 	"github.com/apache/yunikorn-k8shim/pkg/common/constants"
 	"github.com/apache/yunikorn-k8shim/pkg/common/events"
 	"github.com/apache/yunikorn-k8shim/pkg/common/utils"
+	schedulerconf "github.com/apache/yunikorn-k8shim/pkg/conf"
 	"github.com/apache/yunikorn-k8shim/pkg/dispatcher"
 	"github.com/apache/yunikorn-k8shim/pkg/locking"
 	"github.com/apache/yunikorn-k8shim/pkg/log"
@@ -371,7 +372,7 @@ func (task *Task) postTaskAllocated() {
 				"Successfully assigned %s to node %s", task.alias, task.nodeName)
 
 			// before binding pod to node, first bind volumes to pod
-			const maxRetries = 5
+			maxRetries := schedulerconf.GetSchedulerConf().GetPodBindMaxRetries()
 			const baseDelay = 100 * time.Millisecond
 			log.Log(log.ShimCacheTask).Debug("bind pod volumes",
 				zap.String("podName", task.pod.Name),

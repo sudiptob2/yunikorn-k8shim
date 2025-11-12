@@ -68,6 +68,7 @@ const (
 	CMSvcEnableConfigHotRefresh       = PrefixService + "enableConfigHotRefresh"
 	CMSvcPlaceholderImage             = PrefixService + "placeholderImage"
 	CMSvcNodeInstanceTypeNodeLabelKey = PrefixService + "nodeInstanceTypeNodeLabelKey"
+	CMSvcPodBindMaxRetries            = PrefixService + "podBindMaxRetries"
 
 	// kubernetes
 	CMKubeQPS   = PrefixKubernetes + "qps"
@@ -91,6 +92,7 @@ const (
 	DefaultKubeQPS                         = 1000
 	DefaultKubeBurst                       = 1000
 	DefaultAMFilteringGenerateUniqueAppIds = false
+	DefaultPodBindMaxRetries               = 5
 )
 
 var (
@@ -129,6 +131,7 @@ type SchedulerConf struct {
 	InstanceTypeNodeLabelKey string        `json:"instanceTypeNodeLabelKey"`
 	Namespace                string        `json:"namespace"`
 	GenerateUniqueAppIds     bool          `json:"generateUniqueAppIds"`
+	PodBindMaxRetries        int           `json:"podBindMaxRetries"`
 
 	locking.RWMutex
 }
@@ -157,6 +160,7 @@ func (conf *SchedulerConf) Clone() *SchedulerConf {
 		InstanceTypeNodeLabelKey: conf.InstanceTypeNodeLabelKey,
 		Namespace:                conf.Namespace,
 		GenerateUniqueAppIds:     conf.GenerateUniqueAppIds,
+		PodBindMaxRetries:        conf.PodBindMaxRetries,
 	}
 }
 
@@ -287,6 +291,12 @@ func (conf *SchedulerConf) GetKubeConfigPath() string {
 	return conf.KubeConfig
 }
 
+func (conf *SchedulerConf) GetPodBindMaxRetries() int {
+	conf.RLock()
+	defer conf.RUnlock()
+	return conf.PodBindMaxRetries
+}
+
 func GetSchedulerNamespace() string {
 	if value, ok := os.LookupEnv(EnvNamespace); ok {
 		return value
@@ -332,6 +342,7 @@ func CreateDefaultConfig() *SchedulerConf {
 		PlaceHolderImage:         constants.PlaceholderContainerImage,
 		InstanceTypeNodeLabelKey: constants.DefaultNodeInstanceTypeNodeLabelKey,
 		GenerateUniqueAppIds:     DefaultAMFilteringGenerateUniqueAppIds,
+		PodBindMaxRetries:        DefaultPodBindMaxRetries,
 	}
 }
 
@@ -356,6 +367,7 @@ func parseConfig(config map[string]string, prev *SchedulerConf) (*SchedulerConf,
 	parser.boolVar(&conf.EnableConfigHotRefresh, CMSvcEnableConfigHotRefresh)
 	parser.stringVar(&conf.PlaceHolderImage, CMSvcPlaceholderImage)
 	parser.stringVar(&conf.InstanceTypeNodeLabelKey, CMSvcNodeInstanceTypeNodeLabelKey)
+	parser.intVar(&conf.PodBindMaxRetries, CMSvcPodBindMaxRetries)
 
 	// kubernetes
 	parser.intVar(&conf.KubeQPS, CMKubeQPS)

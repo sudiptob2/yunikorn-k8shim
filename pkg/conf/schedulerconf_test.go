@@ -75,6 +75,7 @@ func assertDefaults(t *testing.T, conf *SchedulerConf) {
 	assert.Equal(t, conf.KubeQPS, DefaultKubeQPS)
 	assert.Equal(t, conf.KubeBurst, DefaultKubeBurst)
 	assert.Equal(t, conf.UserLabelKey, constants.DefaultUserLabel)
+	assert.Equal(t, conf.PodBindMaxRetries, DefaultPodBindMaxRetries)
 }
 
 func TestDecompress(t *testing.T) {
@@ -124,6 +125,7 @@ func TestParseConfigMap(t *testing.T) {
 		{CMSvcEnableConfigHotRefresh, "EnableConfigHotRefresh", false},
 		{CMSvcPlaceholderImage, "PlaceHolderImage", "test-image"},
 		{CMSvcNodeInstanceTypeNodeLabelKey, "InstanceTypeNodeLabelKey", "node.kubernetes.io/instance-type"},
+		{CMSvcPodBindMaxRetries, "PodBindMaxRetries", 10},
 		{CMKubeQPS, "KubeQPS", 2345},
 		{CMKubeBurst, "KubeBurst", 3456},
 	}
@@ -155,6 +157,7 @@ func TestUpdateConfigMapNonReloadable(t *testing.T) {
 		{CMSvcDisableGangScheduling, "DisableGangScheduling", true, false},
 		{CMSvcPlaceholderImage, "PlaceHolderImage", "test-image", false},
 		{CMSvcNodeInstanceTypeNodeLabelKey, "InstanceTypeNodeLabelKey", "node.kubernetes.io/instance-type", false},
+		{CMSvcPodBindMaxRetries, "PodBindMaxRetries", 10, true},
 		{CMKubeQPS, "KubeQPS", 2345, false},
 		{CMKubeBurst, "KubeBurst", 3456, false},
 	}
@@ -211,6 +214,73 @@ func TestParseConfigMapWithInvalidDuration(t *testing.T) {
 	assert.Assert(t, conf == nil, "conf exists")
 	assert.Equal(t, 1, len(errs), "wrong error count")
 	assert.ErrorContains(t, errs[0], "invalid duration", "wrong error type")
+}
+
+func TestPodBindMaxRetries(t *testing.T) {
+	tests := []struct {
+		name           string
+		configMapValue string
+		expectedValue  int
+		useConfigMap   bool
+		expectError    bool
+	}{
+		{
+			name:           "default value",
+			configMapValue: "",
+			expectedValue:  DefaultPodBindMaxRetries,
+			useConfigMap:   false,
+			expectError:    false,
+		},
+		{
+			name:           "positive value via ConfigMap",
+			configMapValue: "15",
+			expectedValue:  15,
+			useConfigMap:   true,
+			expectError:    false,
+		},
+		{
+			name:           "negative value for infinite retry",
+			configMapValue: "-1",
+			expectedValue:  -1,
+			useConfigMap:   true,
+			expectError:    false,
+		},
+		{
+			name:           "zero value",
+			configMapValue: "0",
+			expectedValue:  0,
+			useConfigMap:   true,
+			expectError:    false,
+		},
+		{
+			name:           "invalid value",
+			configMapValue: "invalid",
+			useConfigMap:   true,
+			expectError:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.useConfigMap {
+				prev := CreateDefaultConfig()
+				conf, errs := parseConfig(map[string]string{CMSvcPodBindMaxRetries: tt.configMapValue}, prev)
+				if tt.expectError {
+					assert.Assert(t, conf == nil, "conf should be nil on error")
+					assert.Assert(t, errs != nil, "errs should not be nil on error")
+				} else {
+					assert.Assert(t, conf != nil, "conf was nil")
+					assert.Assert(t, errs == nil, errs)
+					assert.Equal(t, tt.expectedValue, conf.PodBindMaxRetries)
+					assert.Equal(t, tt.expectedValue, conf.GetPodBindMaxRetries())
+				}
+			} else {
+				// Test default value
+				conf := GetSchedulerConf()
+				assert.Equal(t, tt.expectedValue, conf.GetPodBindMaxRetries())
+			}
+		})
+	}
 }
 
 // get a configuration value by field name
